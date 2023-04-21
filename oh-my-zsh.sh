@@ -120,7 +120,7 @@ if [[ "$ZSH_DISABLE_COMPFIX" != true ]]; then
   source "$ZSH/lib/compfix.zsh"
   # Load only from secure directories
   compinit -i -d "$ZSH_COMPDUMP"
-  # If completion insecurities exist, warn the user
+  # If completion insecurities exist, warn the userzsh-syntax-highlighting
   handle_completion_insecurities &|
 else
   # If the user wants it, load from all found directories
@@ -146,51 +146,22 @@ if command mkdir "${ZSH_COMPDUMP}.lock" 2>/dev/null; then
   command rm -rf "$ZSH_COMPDUMP.zwc.old" "${ZSH_COMPDUMP}.lock" 
 fi
 
-_omz_source() {
-  local context filepath="$1"
-
-  # Construct zstyle context based on path
-  case "$filepath" in
-  lib/*) context="lib:${filepath:t:r}" ;;         # :t = lib_name.zsh, :r = lib_name
-  plugins/*) context="plugins:${filepath:h:t}" ;; # :h = plugins/plugin_name, :t = plugin_name
-  esac
-
-  local disable_aliases=0
-  zstyle -T ":omz:${context}" aliases || disable_aliases=1
-
-  # Back up alias names prior to sourcing
-  local -a aliases_pre galiases_pre
-  if (( disable_aliases )); then
-    aliases_pre=("${(@k)aliases}")
-    galiases_pre=("${(@k)galiases}")
-  fi
-
-  # Source file from $ZSH_CUSTOM if it exists, otherwise from $ZSH
-  if [[ -f "$ZSH_CUSTOM/$filepath" ]]; then
-    source "$ZSH_CUSTOM/$filepath"
-  elif [[ -f "$ZSH/$filepath" ]]; then
-    source "$ZSH/$filepath"
-  fi
-
-  # Unset all aliases that don't appear in the backed up list of aliases
-  if (( disable_aliases )); then
-    local -a disabled
-    # ${var:|array} gets the list of items in var not in array
-    disabled=("${(@k)aliases:|aliases_pre}" "${(@k)galiases:|galiases_pre}")
-    (( $#disabled == 0 )) || unalias "${(@)disabled}"
-  fi
-}
-
 # Load all of the config files in ~/oh-my-zsh that end in .zsh
 # TIP: Add files you don't want in git to .gitignore
 for config_file ("$ZSH"/lib/*.zsh); do
-  _omz_source "lib/${config_file:t}"
+  custom_config_file="$ZSH_CUSTOM/lib/${config_file:t}"
+  [[ -f "$custom_config_file" ]] && config_file="$custom_config_file"
+  source "$config_file"
 done
 unset custom_config_file
 
 # Load all of the plugins that were defined in ~/.zshrc
 for plugin ($plugins); do
-  _omz_source "plugins/$plugin/$plugin.plugin.zsh"
+  if [[ -f "$ZSH_CUSTOM/plugins/$plugin/$plugin.plugin.zsh" ]]; then
+    source "$ZSH_CUSTOM/plugins/$plugin/$plugin.plugin.zsh"
+  elif [[ -f "$ZSH/plugins/$plugin/$plugin.plugin.zsh" ]]; then
+    source "$ZSH/plugins/$plugin/$plugin.plugin.zsh"
+  fi
 done
 unset plugin
 
@@ -219,5 +190,6 @@ if [[ -n "$ZSH_THEME" ]]; then
   fi
 fi
 
-# set completion colors to be the same as `ls`, after theme has been loaded
-[[ -z "$LS_COLORS" ]] || zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+if [ -f ~/.dir_colors/dircolors ]
+    then eval `dircolors ~/.dir_colors/dircolors`
+fi
